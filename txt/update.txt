@@ -1,0 +1,42 @@
+/**
+ * ============================================================================
+ * MODULE: eventsHandling.js
+ * ============================================================================
+ * Modul ini berfungsi sebagai "Transpiler" sederhana untuk mengubah kode
+ * Object Action Language (OAL) menjadi kode C#.
+ * * Tanggung Jawab Utama:
+ * 1. Instansiasi Objek (Create Instance)
+ * 2. Akses Data Event (Event Parameters)
+ * 3. Pengiriman Event (Signaling & Timers)
+ * 4. Manipulasi Atribut & Relasi Sederhana
+ * * Modul ini dirancang untuk bekerja dengan sistem State Machine yang
+ * di-generate ke dalam C#.
+ */
+
+ /**
+ * ============================================================================
+ * MODULE: eventsHandling_2.js (VERSION 2.0)
+ * ============================================================================
+ * Modul Transpiler: Object Action Language (OAL) -> C#.
+ * * Modul ini bertugas menerjemahkan logika bisnis yang ditulis dalam sintaks
+ * sederhana (OAL) menjadi kode C# yang valid untuk dijalankan di Unity/DotNet.
+ * * FITUR UTAMA:
+ * 1. Control Flow: Menerjemahkan IF, ELSE IF, ELSE, dan END IF menjadi blok {}.
+ * 2. Logical Operators: Mengubah AND/OR/NOT menjadi &&/||/!.
+ * 3. Event Handling: Mengirim event (Send), Timer, dan membaca data (rcvd_evt).
+ * 4. Object Management: Create Instance dan Assignment variabel.
+ * ============================================================================
+ */
+
+ /**
+ * ============================================================================
+ * MODULE: eventsHandling_3.js (STANDARD OAL VERSION)
+ * ============================================================================
+ * Modul transpiler untuk mengubah Standard OAL (xtUML/BridgePoint Style) ke C#.
+ * * SYNTAX SUPPORT:
+ * 1. Creation: create object instance <var> of <Class>;
+ * 2. Generate: generate <Event> to <Target> [delay <Time>];
+ * 3. Assign:   assign <var> = <val>;
+ * 4. Logic:    if, elif, else, end if
+ * ============================================================================
+ */
