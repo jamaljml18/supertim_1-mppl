@@ -9,7 +9,7 @@ Instance Selection by Relationship Navigation	❌	Belum ada. Tidak ada penangana
 
 2. Relasi (Relationship)
 Komponen	Status	Penjelasan Kode
-Creating Instances of a Relationship	✅	Regex: relate ... across ... diubah menjadi method .RelateTo(...).
+Creating Instances of a Relationship	❌	Regex: relate ... across ... diubah menjadi method .RelateTo(...).
 Deleting Instance of a Relationship	❌	Belum ada. Tidak ada regex untuk unrelate ... from ....
 
 3. Event & State Machine
