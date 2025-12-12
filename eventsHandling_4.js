@@ -59,16 +59,7 @@ const EventCompiler = {
     );
 
     // ---------------------------------------------------------
-    // F. INSTANCE DELETION
-    // ---------------------------------------------------------
-
-    code = code.replace(
-      /delete\s+object\s+instance\s+([A-Za-z0-9_]+);/g,
-      "Population.$1.constructor.name ? Population[Population.$1.constructor.name] = Population[Population.$1.constructor.name].filter(item => item !== $1) : null;"
-    );
-
-    // ---------------------------------------------------------
-    // F2. CREATING RELATIONSHIP INSTANCE
+    // F. CREATING RELATIONSHIP INSTANCE
     // ---------------------------------------------------------
     // OAL: create relationship instance r1 between a and b of R1;
     code = code.replace(
@@ -77,7 +68,7 @@ const EventCompiler = {
     );
 
     // ---------------------------------------------------------
-    // F3. DELETING RELATIONSHIP INSTANCE
+    // F2. DELETING RELATIONSHIP INSTANCE
     // ---------------------------------------------------------
 
     // delete relationship instance r1;
@@ -156,7 +147,7 @@ const EventCompiler = {
     // =====================================================================
     // 4. CONTROL FLOW
     // =====================================================================
-    
+
     const regexIf = /if\s*\((.*?)\)\s*(?:then)?/gi;
     code = code.replace(regexIf, "if ($1) {");
 
