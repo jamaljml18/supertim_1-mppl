@@ -4,6 +4,21 @@ const EventCompiler = {
 
     let code = oalCode;
 
+function compileChainedNavigation(code) {
+  const navRegex =
+    /([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*)\s*->\s*([A-Za-z0-9_]+)\[([A-Za-z0-9_]+)\]/g;
+
+  let prev;
+  do {
+    prev = code;
+    code = code.replace(navRegex, (_, source, rel, cls) => {
+      return `${source}.GetRelated("${rel}").filter(o => o instanceof ${cls})`;
+    });
+  } while (code !== prev);
+
+  return code;
+}
+
     // =====================================================================
     // 1. EXPLICIT EVENT HANDLING (NEW REQUEST)
     // =====================================================================
@@ -15,34 +30,36 @@ const EventCompiler = {
     );
 
     // B. CREATE TIMER (Explicit)
-    code = code.replace(/create\s+timer\s+([A-Za-z0-9_]+)\s+of\s+\((.*?)\)\s+generating\s+([A-Za-z0-9_]+);/g, "var $1 = $3.Target.StartTimer($3, $2);");
+    code = code.replace(
+      /create\s+timer\s+([A-Za-z0-9_]+)\s+of\s+\((.*?)\)\s+generating\s+([A-Za-z0-9_]+);/g,
+      "var $1 = $3.Target.StartTimer($3, $2);"
+    );
 
     // C. GENERATE EVENT INSTANCE (Explicit)
-    code = code.replace(/generate\s+([A-Za-z0-9_]+);/g, "$1.Target.GenerateEvent($1);");
+    code = code.replace(
+      /generate\s+([A-Za-z0-9_]+);/g,
+      "$1.Target.GenerateEvent($1);"
+    );
 
     // =====================================================================
     // 2. STANDARD OAL COMMANDS
     // =====================================================================
 
     // D. INSTANCE CREATION
-    code = code.replace(/create\s+object\s+instance\s+([A-Za-z0-9_]+)\s+of\s+([A-Za-z0-9_]+);/g, "var $1 = new $2();");
-
-    // ---------------------------------------------------------
-    // D2. INSTANCE DELETION (BARU)
-    // ---------------------------------------------------------
-    // OAL: delete object instance a;
-    // C# : a.Delete();
-    code = code.replace(/delete\s+object\s+instance\s+([A-Za-z0-9_]+);/g, "$1.Delete();");
-
-    // OAL Short version: delete a; (jika ada)
-    code = code.replace(/^\s*delete\s+([A-Za-z0-9_]+);/gm, "$1.Delete();");
+    code = code.replace(
+      /create\s+object\s+instance\s+([A-Za-z0-9_]+)\s+of\s+([A-Za-z0-9_]+);/g,
+      "var $1 = new $2();"
+    );
 
     // ---------------------------------------------------------
     // E. INSTANCE SELECTION
     // ---------------------------------------------------------
 
     // SELECT ANY
-    code = code.replace(/select\s+any\s+([A-Za-z0-9_]+)\s+from\s+instances\s+of\s+([A-Za-z0-9_]+);/g, "var $1 = Population.$2[0] || null;");
+    code = code.replace(
+      /select\s+any\s+([A-Za-z0-9_]+)\s+from\s+instances\s+of\s+([A-Za-z0-9_]+);/g,
+      "var $1 = Population.$2[0] || null;"
+    );
 
     // SELECT ONE with WHERE
     code = code.replace(
@@ -55,6 +72,35 @@ const EventCompiler = {
       /select\s+many\s+([A-Za-z0-9_]+)\s+from\s+instances\s+of\s+([A-Za-z0-9_]+)\s+where\s*\((.*?)\);/g,
       "var $1 = Population.$2.filter(item => $3);"
     );
+
+    // ---------------------------------------------------------
+    // E2. INSTANCE SELECTION BY RELATIONSHIP NAVIGATION 
+    // ---------------------------------------------------------
+
+    // SELECT ONE by Relationship Navigation
+    code = code.replace(
+      /select\s+one\s+([A-Za-z0-9_]+)\s+from\s+([A-Za-z0-9_]+)\s+across\s+([A-Za-z0-9_]+);/g,
+      "var $1 = ($2.GetRelated('$3')[0]) || null;"
+    );
+
+    // SELECT MANY by Relationship Navigation
+    code = code.replace(
+      /select\s+many\s+([A-Za-z0-9_]+)\s+from\s+([A-Za-z0-9_]+)\s+across\s+([A-Za-z0-9_]+)\s+where\s*\((.*?)\);/g,
+      "var $1 = $2.GetRelated('$3').filter(item => $4);"
+    );
+
+    code = code.replace(
+      /select\s+many\s+([A-Za-z0-9_]+)\s+from\s+([A-Za-z0-9_]+)\s+across\s+([A-Za-z0-9_]+);/g,
+      "var $1 = $2.GetRelated('$3');"
+    );
+
+    // SELECT ANY by Relationship Navigation
+    code = code.replace(
+      /select\s+any\s+([A-Za-z0-9_]+)\s+from\s+([A-Za-z0-9_]+)\s+across\s+([A-Za-z0-9_]+);/g,
+      "var $1 = ($2.GetRelated('$3')[0]) || null;"
+    );
+    
+    code = compileChainedNavigation(code);
 
     // ---------------------------------------------------------
     // F. CREATING RELATIONSHIP INSTANCE
@@ -70,7 +116,10 @@ const EventCompiler = {
     // ---------------------------------------------------------
 
     // delete relationship instance r1;
-    code = code.replace(/delete\s+relationship\s+instance\s+([A-Za-z0-9_]+);/g, "$1.Delete();");
+    code = code.replace(
+      /delete\s+relationship\s+instance\s+([A-Za-z0-9_]+);/g,
+      "$1.Delete();"
+    );
 
     // delete relationship instance r1 between a and b of R1;
     code = code.replace(
@@ -84,10 +133,16 @@ const EventCompiler = {
     code = code.replace(/^\s*assign\s+/gm, "");
 
     // G2. RELATE
-    code = code.replace(/relate\s+([A-Za-z0-9_.]+)\s+to\s+([A-Za-z0-9_]+)\s+across\s+([A-Za-z0-9_]+);/g, '$1.RelateTo($2, "$3");');
+    code = code.replace(
+      /relate\s+([A-Za-z0-9_.]+)\s+to\s+([A-Za-z0-9_]+)\s+across\s+([A-Za-z0-9_]+);/g,
+      '$1.RelateTo($2, "$3");'
+    );
 
     // H. CANCEL TIMER
-    code = code.replace(/cancel\s+([A-Za-z0-9_]+)\s+from\s+([A-Za-z0-9_.]+);/g, "$2.CancelTimer(Events.$1);");
+    code = code.replace(
+      /cancel\s+([A-Za-z0-9_]+)\s+from\s+([A-Za-z0-9_.]+);/g,
+      "$2.CancelTimer(Events.$1);"
+    );
 
     // =====================================================================
     // 3. DATA ACCESS & LOGIC
@@ -113,13 +168,25 @@ const EventCompiler = {
     code = code.replace(/\bcurrent_date\b/gi, "DateTime.Today");
     code = code.replace(/\bcurrent\s+date\b/gi, "DateTime.Today");
 
-    code = code.replace(/add_days\s*\(\s*([A-Za-z0-9_.]+)\s*,\s*([0-9]+)\s*\)/gi, "$1.AddDays($2)");
+    code = code.replace(
+      /add_days\s*\(\s*([A-Za-z0-9_.]+)\s*,\s*([0-9]+)\s*\)/gi,
+      "$1.AddDays($2)"
+    );
 
-    code = code.replace(/dateadd\s*\(\s*([A-Za-z0-9_.]+)\s*,\s*([0-9]+)\s*\)/gi, "$1.AddDays($2)");
+    code = code.replace(
+      /dateadd\s*\(\s*([A-Za-z0-9_.]+)\s*,\s*([0-9]+)\s*\)/gi,
+      "$1.AddDays($2)"
+    );
 
-    code = code.replace(/([A-Za-z0-9_.]+)\s*\+\s*([0-9]+)\s+days/gi, "$1.AddDays($2)");
+    code = code.replace(
+      /([A-Za-z0-9_.]+)\s*\+\s*([0-9]+)\s+days/gi,
+      "$1.AddDays($2)"
+    );
 
-    code = code.replace(/date_parse\s*\(\s*(.*?)\s*\)/gi, "DateTime.Parse($1)");
+    code = code.replace(
+      /date_parse\s*\(\s*(.*?)\s*\)/gi,
+      "DateTime.Parse($1)"
+    );
 
     // =====================================================================
     // 4. CONTROL FLOW
@@ -137,5 +204,6 @@ const EventCompiler = {
     return code;
   },
 };
+
 
 
