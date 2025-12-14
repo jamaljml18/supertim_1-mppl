@@ -1,0 +1,29 @@
+{
+  "type": "subsystem",
+  "sub_id": "test_01",
+  "model": [
+    {
+      "type": "class",
+      "class_id": "99",
+      "class_name": "Laporan",
+      "attributes": [{ "attribute_name": "judul", "data_type": "string" }],
+      "states": [
+        {
+          "state_id": "1",
+          "state_name": "Kadaluarsa",
+          "action_oal": "// Tes Delete di dalam State\ndelete object instance self;"
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "ArsipkanLaporan",
+      "return_type": "void",
+      "parameters": [
+        { "name": "laporanTarget", "data_type": "Laporan" },
+        { "name": "paksaHapus", "data_type": "boolean" }
+      ],
+      "action_oal": "// Tes Logika di dalam Fungsi\nif (paksaHapus) then\n  delete object instance laporanTarget;\nend if;"
+    }
+  ]
+}

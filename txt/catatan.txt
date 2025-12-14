@@ -1,0 +1,37 @@
+1. Manipulasi Data & Objek
+Komponen	Status	Penjelasan Kode
+Instance Creation	✅	Regex: create object instance ... diubah menjadi new Class().
+Instance Selection	✅	Belum ada. Tidak ada regex untuk select any, select many, atau from instances of. Variabel s dan e di kodemu diasumsikan sudah ada, padahal di OAL asli harus di-select dulu.
+Instance Deletion	❌	Belum ada. Tidak ada regex untuk delete object instance.
+Writing Attributes	✅	Regex assign dihapus, menyisakan sintaks self.status = ... yang valid di C#.
+Reading Attributes	✅	Implisit. Contoh: self.end_time langsung terbaca sebagai properti C#.
+Instance Selection by Relationship Navigation	❌	Belum ada. Tidak ada penanganan sintaks navigasi relasi (misal: self->R1[Emp]).
+
+2. Relasi (Relationship)
+Komponen	Status	Penjelasan Kode
+Creating Instances of a Relationship	✅	Regex: relate ... across ... diubah menjadi method .RelateTo(...).
+Deleting Instance of a Relationship	✅	Belum ada. Tidak ada regex untuk unrelate ... from ....
+
+3. Event & State Machine
+Komponen	Status	Penjelasan Kode
+Creating Events	✅	Regex baru: create event instance ... sudah ditangani.
+Generating Events	✅	Regex baru: generate ... (baik langsung maupun via handle) sudah ditangani.
+Accessing Event Data	✅	Regex: rcvd_evt diubah menjadi eventArgs.
+Timers	✅	Regex: create timer ... diubah menjadi .StartTimer(...).
+Cancel Timer	✅	Regex: cancel ... diubah menjadi .CancelTimer(...).
+
+4. Logika & Kontrol
+Komponen	Status	Penjelasan Kode
+Control Logic	⚠️	Parsial. if, else, elif, end if sudah ada. Tapi loop (for, while, break) belum ada.
+Arithmetic, Logical, String Assignment	✅	Operator and, or, not sudah dikonversi ke C# (&&, `
+Unary Operators	✅	not sudah ditangani. Operator minus (-) biasanya otomatis jalan. empty belum dicek (untuk null check).
+
+5. Struktur & Lainnya
+Komponen	Status	Penjelasan Kode
+Operations	❌	Belum ada. Loop JSON kamu hanya membaca states. Tidak ada pembacaan operations di level kelas.
+Bridges	❌	Belum ada. Bridge (seperti TIM::current_date()) tidak dikenali regex. Hanya Timer khusus (create timer) yang di-hardcode.
+Functions	❌	Belum ada. Tidak ada penanganan fungsi global (Domain Functions).
+Inter-component Messaging	❌	Belum ada. Tidak ada penanganan Port atau Interface messages.
+Object Action Language for Non-State Actions	❌	Belum ada. Karena parser kamu hanya melihat action_oal di dalam states, OAL di tempat lain (operasi/fungsi) tidak akan terkompilasi.
+Date and Time	✅	Parsial. Kamu menggunakan CurrentTime di OAL, tapi compiler tidak mengubahnya menjadi DateTime.Now. C# akan menganggap itu variabel lokal yang mungkin tidak ada.
+

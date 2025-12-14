@@ -1,0 +1,219 @@
+{
+  "type": "subsystem",
+  "sub_id": "s_absensi",
+  "sub_name": "SistemAbsensi",
+  "model": [
+    {
+      "type": "class",
+      "class_id": "101",
+      "class_name": "Employee",
+      "KL": "Emp",
+      "attributes": [
+        { "attribute_name": "employee_id", "data_type": "id" },
+        { "attribute_name": "name", "data_type": "string" },
+        { "attribute_name": "email", "data_type": "string" }
+      ]
+    },
+    {
+      "type": "class",
+      "class_id": "102",
+      "class_name": "Schedule",
+      "KL": "Sch",
+      "attributes": [
+        { "attribute_name": "schedule_id", "data_type": "id" },
+        { "attribute_name": "start_time", "data_type": "string" },
+        { "attribute_name": "end_time", "data_type": "string" },
+        { "attribute_name": "buffer_time_minutes", "data_type": "integer" }
+      ]
+    },
+    {
+      "type": "class",
+      "class_id": "103",
+      "class_name": "Attendance",
+      "KL": "Att",
+      "attributes": [
+        { "attribute_name": "attendance_id", "data_type": "id" },
+        { "attribute_name": "employee_id", "data_type": "id" },
+        { "attribute_name": "schedule_id", "data_type": "id" },
+        {
+          "attribute_name": "status",
+          "default_value": "states.Pending",
+          "data_type": "state"
+        },
+        { "attribute_name": "actual_time", "data_type": "string" },
+        { "attribute_name": "permission_uploaded", "data_type": "boolean" }
+      ],
+      "states": [
+        {
+          "state_id": "1",
+          "state_name": "Pending",
+          "state_value": "Pending",
+          "state_type": "string",
+          "state_event": [
+            "record_in_time",
+            "record_late",
+            "schedule_end_passed",
+            "upload_permission"
+          ],
+          "transitions": [
+            {
+              "target_state_id": "2",
+              "target_state": "Present",
+              "event": "record_in_time"
+            },
+            {
+              "target_state_id": "3",
+              "target_state": "Late",
+              "event": "record_late"
+            },
+            {
+              "target_state_id": "4",
+              "target_state": "Absent",
+              "event": "schedule_end_passed"
+            },
+            {
+              "target_state_id": "5",
+              "target_state": "Permission",
+              "event": "upload_permission"
+            }
+          ],
+          "action": "// Initial State",
+          "action_oal": "assign self.status = \"Pending\";\nassign self.permission_uploaded = false;\n// Mengatur timer 30 menit setelah end_time\ngenerate schedule_end_passed to self delay (self.end_time + 30);"
+        },
+        {
+          "state_id": "2",
+          "state_name": "Present",
+          "state_value": "Present",
+          "state_type": "string",
+          "state_event": [],
+          "transitions": [],
+          "action_oal": "assign self.status = \"Present\";\nassign self.actual_time = rcvd_evt.time;\ncancel schedule_end_passed from self;\ngenerate Email to Notification;"
+        },
+        {
+          "state_id": "3",
+          "state_name": "Late",
+          "state_value": "Late",
+          "state_type": "string",
+          "state_event": [],
+          "transitions": [],
+          "action_oal": "assign self.status = \"Late\";\nassign self.actual_time = rcvd_evt.time;\ncancel schedule_end_passed from self;\ngenerate Email to Notification;"
+        },
+        {
+          "state_id": "4",
+          "state_name": "Absent",
+          "state_value": "Absent",
+          "state_type": "string",
+          "state_event": ["upload_permission"],
+          "transitions": [
+            {
+              "target_state_id": "5",
+              "target_state": "Permission",
+              "event": "upload_permission"
+            }
+          ],
+          "action_oal": "assign self.status = \"Absent\";\ngenerate Email to Notification;"
+        },
+        {
+          "state_id": "5",
+          "state_name": "Permission",
+          "state_value": "Permission",
+          "state_type": "string",
+          "state_event": [
+            "review_confirmed",
+            "review_rejected",
+            "cancel_permission"
+          ],
+          "transitions": [
+            {
+              "target_state_id": "6",
+              "target_state": "Confirmed",
+              "event": "review_confirmed"
+            },
+            {
+              "target_state_id": "7",
+              "target_state": "Rejected",
+              "event": "review_rejected"
+            },
+            {
+              "target_state_id": "8",
+              "target_state": "Canceled",
+              "event": "cancel_permission"
+            }
+          ],
+          "action_oal": "assign self.status = \"Permission\";\nassign self.permission_uploaded = true;\ncancel schedule_end_passed from self;\ngenerate Email to Notification;"
+        },
+        {
+          "state_id": "6",
+          "state_name": "Confirmed",
+          "state_value": "Confirmed",
+          "state_type": "string",
+          "state_event": [],
+          "transitions": [],
+          "action_oal": "assign self.status = \"Confirmed\";\ngenerate Email to Notification;"
+        },
+        {
+          "state_id": "7",
+          "state_name": "Rejected",
+          "state_value": "Rejected",
+          "state_type": "string",
+          "state_event": ["schedule_end_passed"],
+          "transitions": [
+            {
+              "target_state_id": "4",
+              "target_state": "Absent",
+              "event": "schedule_end_passed"
+            }
+          ],
+          "action_oal": "assign self.status = \"Rejected\";\ngenerate Email to Notification;"
+        },
+        {
+          "state_id": "8",
+          "state_name": "Canceled",
+          "state_value": "Canceled",
+          "state_type": "string",
+          "state_event": ["schedule_end_passed"],
+          "transitions": [
+            {
+              "target_state_id": "4",
+              "target_state": "Absent",
+              "event": "schedule_end_passed"
+            }
+          ],
+          "action_oal": "assign self.status = \"Canceled\";\nassign self.permission_uploaded = false;\nif (CurrentTime < self.end_time) then\n  generate schedule_end_passed to self delay (self.end_time + 30);\nend if;\ngenerate Email to Notification;"
+        }
+      ]
+    },
+    {
+      "type": "association",
+      "name": "R1",
+      "class": [
+        {
+          "class_id": "101",
+          "class_name": "Employee",
+          "class_multiplicity": "1..1"
+        },
+        {
+          "class_id": "103",
+          "class_name": "Attendance",
+          "class_multiplicity": "0..*"
+        }
+      ]
+    },
+    {
+      "type": "association",
+      "name": "R2",
+      "class": [
+        {
+          "class_id": "102",
+          "class_name": "Schedule",
+          "class_multiplicity": "1..1"
+        },
+        {
+          "class_id": "103",
+          "class_name": "Attendance",
+          "class_multiplicity": "0..*"
+        }
+      ]
+    }
+  ]
+}
