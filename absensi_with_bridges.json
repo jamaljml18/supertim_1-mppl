@@ -1,0 +1,85 @@
+{
+  "model": [
+    {
+      "type": "class",
+      "class_name": "Employee",
+      "class_id": "EMP001",
+      "attributes": [
+        { "attribute_name": "employee_id", "data_type": "integer" },
+        { "attribute_name": "name", "data_type": "string" },
+        { "attribute_name": "email", "data_type": "string" },
+        { "attribute_name": "department", "data_type": "string" },
+        { "attribute_name": "join_date", "data_type": "date" },
+        { "attribute_name": "is_active", "data_type": "boolean" }
+      ],
+      "states": [
+        {
+          "state_id": "EMP_S1",
+          "state_name": "Created",
+          "action_oal": "assign self.is_active = true;\nTIM::log(TIM::string_concat(\"Employee \", TIM::to_string(self.employee_id), \" created\"));"
+        }
+      ]
+    },
+    {
+      "type": "class",
+      "class_name": "Attendance",
+      "class_id": "ATT001",
+      "attributes": [
+        { "attribute_name": "attendance_id", "data_type": "integer" },
+        { "attribute_name": "employee_id", "data_type": "integer" },
+        { "attribute_name": "date_recorded", "data_type": "date" },
+        { "attribute_name": "check_in_time", "data_type": "string" },
+        { "attribute_name": "check_out_time", "data_type": "string" },
+        { "attribute_name": "status", "data_type": "string" },
+        { "attribute_name": "working_hours", "data_type": "real" },
+        { "attribute_name": "is_late", "data_type": "boolean" },
+        { "attribute_name": "is_overtime", "data_type": "boolean" },
+        { "attribute_name": "notes", "data_type": "string" },
+        { "attribute_name": "approved_by", "data_type": "string" },
+        { "attribute_name": "approval_date", "data_type": "date" }
+      ],
+      "states": [
+        {
+          "state_id": "ATT_S1",
+          "state_name": "Pending",
+          "action_oal": "assign self.date_recorded = TIM::current_date();\nassign self.status = \"Pending\";\nTIM::log(TIM::string_concat(\"Attendance ID \", TIM::to_string(self.attendance_id), \" initialized\"));"
+        },
+        {
+          "state_id": "ATT_S2",
+          "state_name": "CheckedIn",
+          "action_oal": "assign self.check_in_time = TIM::current_time();\nassign self.status = \"Checked In\";\nTIM::log(\"Employee checked in at \" + TIM::to_string(self.check_in_time));"
+        },
+        {
+          "state_id": "ATT_S3",
+          "state_name": "Present",
+          "action_oal": "assign self.status = \"Present\";\nassign self.is_late = false;\nif (TIM::string_concat(self.check_in_time) > \"09:00:00\") then assign self.is_late = true; end if;\nTIM::log_info(TIM::string_concat(\"Attendance record updated - Late: \", TIM::to_string(self.is_late)));"
+        },
+        {
+          "state_id": "ATT_S4",
+          "state_name": "CheckedOut",
+          "action_oal": "assign self.check_out_time = TIM::current_time();\nassign self.status = \"Checked Out\";\nTIM::log(\"Employee checked out at \" + TIM::to_string(self.check_out_time));"
+        },
+        {
+          "state_id": "ATT_S5",
+          "state_name": "CalculatingHours",
+          "action_oal": "assign self.working_hours = 8.5;\nassign self.working_hours = TIM::round(self.working_hours, 2);\nif (self.working_hours > 9.0) then assign self.is_overtime = true; end if;\nTIM::log(TIM::string_concat(\"Working hours calculated: \", TIM::to_string(self.working_hours)));"
+        },
+        {
+          "state_id": "ATT_S6",
+          "state_name": "Approved",
+          "action_oal": "assign self.status = \"Approved\";\nassign self.approval_date = TIM::current_date();\nassign self.approved_by = \"Manager\";\nTIM::log_info(TIM::string_upper(\"Attendance approved\"));"
+        },
+        {
+          "state_id": "ATT_S7",
+          "state_name": "Rejected",
+          "action_oal": "assign self.status = \"Rejected\";\nTIM::log_warning(TIM::string_concat(\"Attendance ID \", TIM::to_string(self.attendance_id), \" rejected\"));"
+        },
+        {
+          "state_id": "ATT_S8",
+          "state_name": "Archived",
+          "action_oal": "assign self.status = \"Archived\";\nTIM::log(TIM::string_concat(\"Attendance record archived on \", TIM::to_string(TIM::current_date())));"
+        }
+      ]
+    }
+  ]
+}

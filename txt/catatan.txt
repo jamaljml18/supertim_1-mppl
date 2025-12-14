@@ -29,9 +29,30 @@ Unary Operators	✅	not sudah ditangani. Operator minus (-) biasanya otomatis ja
 5. Struktur & Lainnya
 Komponen	Status	Penjelasan Kode
 Operations	❌	Belum ada. Loop JSON kamu hanya membaca states. Tidak ada pembacaan operations di level kelas.
-Bridges	❌	Belum ada. Bridge (seperti TIM::current_date()) tidak dikenali regex. Hanya Timer khusus (create timer) yang di-hardcode.
+Bridges	✅	IMPLEMENTED. 59 bridges across 8 categories (DateTime, String, Collection, Math, Conversion, Logging, File, Misc). Uses TIM:: prefix for all bridge calls. Sequential resolution with max 10 iterations for nested bridges. Depth-tracked argument parsing to preserve all arguments correctly.
 Functions ✅	Compiler sekarang bisa membaca model function global dari JSON, menerjemahkan parameter, menangani tipe data (termasuk perbaikan void tadi), dan mengonversi isi fungsinya menjadi static method C#..
 Inter-component Messaging	❌	Belum ada. Tidak ada penanganan Port atau Interface messages.
 Object Action Language for Non-State Actions	❌	Belum ada. Karena parser kamu hanya melihat action_oal di dalam states, OAL di tempat lain (operasi/fungsi) tidak akan terkompilasi.
 Date and Time	✅	Parsial. Kamu menggunakan CurrentTime di OAL, tapi compiler tidak mengubahnya menjadi DateTime.Now. C# akan menganggap itu variabel lokal yang mungkin tidak ada.
+
+=== BRIDGES DOCUMENTATION ===
+Bridge Categories (59 total):
+1. DateTime (7): current_date, current_time, add_days, add_hours, add_minutes, day_of, month_of
+2. String (18): string_upper, string_lower, string_concat, string_length, string_trim, string_replace, string_contains, string_starts_with, string_ends_with, string_substring, string_index_of, string_split, string_equals, string_equals_ignore_case, string_empty, is_empty_string, is_not_empty_string
+3. Collection (12): size, is_empty, is_not_empty, cardinality, add_to_collection, remove_from_collection, clear_collection, collection_contains, first_element, last_element, collection_to_list, collection_to_array
+4. Math (10): abs, ceiling, floor, round, sqrt, power, min, max, random, random_range
+5. Conversion (8): to_string, to_integer, to_real, to_boolean, to_date, try_to_integer, try_to_real, to_decimal
+6. Logging (8): log, log_error, log_info, log_warning, log_debug, print, print_line, debug_break
+7. File (4): file_read, file_write, file_exists, file_delete
+8. Misc (2): get_guid, get_hash
+
+Usage: TIM::bridge_name(arg1, arg2, ...)
+Example: TIM::log(TIM::string_concat("ID: ", TIM::to_string(self.id)))
+Output: Console.WriteLine(string.Concat("ID: ", self.id.ToString()))
+
+Implementation:
+- bridges dictionary: Maps bridge name to {type, args, template/csharp}
+- resolveBridges(): Iterative resolution with max 10 iterations for nested bridges
+- parseArguments(): Depth-tracked parsing to handle nested parentheses correctly
+- Integration: Called at beginning of compileAction() before other OAL transformations
 

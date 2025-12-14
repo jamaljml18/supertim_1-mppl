@@ -1,8 +1,236 @@
 const EventCompiler = {
+  bridges: {
+    "current_date": { type: "datetime", args: 0, csharp: "DateTime.Today" },
+    "current_time": { type: "datetime", args: 0, csharp: "DateTime.Now" },
+    "add_days": { type: "datetime", args: 2, template: "{0}.AddDays({1})" },
+    "add_hours": { type: "datetime", args: 2, template: "{0}.AddHours({1})" },
+    "add_minutes": { type: "datetime", args: 2, template: "{0}.AddMinutes({1})" },
+    "day_of": { type: "datetime", args: 1, template: "{0}.Day" },
+    "month_of": { type: "datetime", args: 1, template: "{0}.Month" },
+    "string_upper": { type: "string", args: 1, template: "{0}.ToUpper()" },
+    "string_lower": { type: "string", args: 1, template: "{0}.ToLower()" },
+    "string_concat": { type: "string", args: -1, template: "string.Concat({0})" },
+    "string_length": { type: "string", args: 1, template: "{0}.Length" },
+    "string_trim": { type: "string", args: 1, template: "{0}.Trim()" },
+    "string_replace": { type: "string", args: 3, template: "{0}.Replace({1}, {2})" },
+    "string_contains": { type: "string", args: 2, template: "{0}.Contains({1})" },
+    "string_starts_with": { type: "string", args: 2, template: "{0}.StartsWith({1})" },
+    "string_ends_with": { type: "string", args: 2, template: "{0}.EndsWith({1})" },
+    "string_substring": { type: "string", args: 3, template: "{0}.Substring({1}, {2})" },
+    "string_index_of": { type: "string", args: 2, template: "{0}.IndexOf({1})" },
+    "string_split": { type: "string", args: 2, template: "{0}.Split({1})" },
+    "string_equals": { type: "string", args: 2, template: "{0}.Equals({1})" },
+    "string_equals_ignore_case": { type: "string", args: 2, template: "{0}.Equals({1}, StringComparison.OrdinalIgnoreCase)" },
+    "string_empty": { type: "string", args: 0, csharp: "string.Empty" },
+    "is_empty_string": { type: "string", args: 1, template: "string.IsNullOrEmpty({0})" },
+    "is_not_empty_string": { type: "string", args: 1, template: "!string.IsNullOrEmpty({0})" },
+    "size": { type: "collection", args: 1, template: "{0}.Count()" },
+    "is_empty": { type: "collection", args: 1, template: "({0}.Count() == 0)" },
+    "is_not_empty": { type: "collection", args: 1, template: "({0}.Count() > 0)" },
+    "cardinality": { type: "collection", args: 1, template: "{0}.Count()" },
+    "add_to_collection": { type: "collection", args: 2, template: "{0}.Add({1})" },
+    "remove_from_collection": { type: "collection", args: 2, template: "{0}.Remove({1})" },
+    "clear_collection": { type: "collection", args: 1, template: "{0}.Clear()" },
+    "collection_contains": { type: "collection", args: 2, template: "{0}.Contains({1})" },
+    "first_element": { type: "collection", args: 1, template: "{0}.FirstOrDefault()" },
+    "last_element": { type: "collection", args: 1, template: "{0}.LastOrDefault()" },
+    "collection_to_list": { type: "collection", args: 1, template: "{0}.ToList()" },
+    "collection_to_array": { type: "collection", args: 1, template: "{0}.ToArray()" },
+    "abs": { type: "math", args: 1, template: "Math.Abs({0})" },
+    "ceiling": { type: "math", args: 1, template: "Math.Ceiling({0})" },
+    "floor": { type: "math", args: 1, template: "Math.Floor({0})" },
+    "round": { type: "math", args: 2, template: "Math.Round({0}, {1})" },
+    "sqrt": { type: "math", args: 1, template: "Math.Sqrt({0})" },
+    "power": { type: "math", args: 2, template: "Math.Pow({0}, {1})" },
+    "min": { type: "math", args: 2, template: "Math.Min({0}, {1})" },
+    "max": { type: "math", args: 2, template: "Math.Max({0}, {1})" },
+    "random": { type: "math", args: 0, csharp: "new Random().Next()" },
+    "random_range": { type: "math", args: 2, template: "new Random().Next({0}, {1})" },
+    "to_string": { type: "conversion", args: 1, template: "{0}.ToString()" },
+    "to_integer": { type: "conversion", args: 1, template: "int.Parse({0})" },
+    "to_real": { type: "conversion", args: 1, template: "double.Parse({0})" },
+    "to_boolean": { type: "conversion", args: 1, template: "bool.Parse({0})" },
+    "to_date": { type: "conversion", args: 1, template: "DateTime.Parse({0})" },
+    "try_to_integer": { type: "conversion", args: 2, template: "int.TryParse({0}, out {1})" },
+    "try_to_real": { type: "conversion", args: 2, template: "double.TryParse({0}, out {1})" },
+    "to_decimal": { type: "conversion", args: 1, template: "decimal.Parse({0})" },
+    "log": { type: "logging", args: 1, template: "Console.WriteLine({0})" },
+    "log_error": { type: "logging", args: 1, template: "Console.Error.WriteLine({0})" },
+    "log_info": { type: "logging", args: 1, template: "Console.WriteLine(\"[INFO] \" + {0})" },
+    "log_warning": { type: "logging", args: 1, template: "Console.WriteLine(\"[WARN] \" + {0})" },
+    "log_debug": { type: "logging", args: 1, template: "Console.WriteLine(\"[DEBUG] \" + {0})" },
+    "print": { type: "logging", args: 1, template: "Console.Write({0})" },
+    "print_line": { type: "logging", args: 1, template: "Console.WriteLine({0})" },
+    "debug_break": { type: "logging", args: 0, csharp: "System.Diagnostics.Debugger.Break()" },
+    "file_read": { type: "file", args: 1, template: "System.IO.File.ReadAllText({0})" },
+    "file_write": { type: "file", args: 2, template: "System.IO.File.WriteAllText({0}, {1})" },
+    "file_exists": { type: "file", args: 1, template: "System.IO.File.Exists({0})" },
+    "file_delete": { type: "file", args: 1, template: "System.IO.File.Delete({0})" },
+    "get_guid": { type: "misc", args: 0, csharp: "Guid.NewGuid().ToString()" },
+    "get_hash": { type: "misc", args: 1, template: "\"{0}\".GetHashCode().ToString()" },
+  },
+
+  resolveBridges: function(code) {
+    let result = code;
+    let iterations = 0;
+    const maxIterations = 15;
+
+    while (iterations < maxIterations) {
+      iterations++;
+      let foundBridge = false;
+
+      // Find first TIM:: occurrence
+      const timIdx = result.indexOf('TIM::');
+      if (timIdx === -1) break;
+
+      // Extract function name
+      let funcEndIdx = timIdx + 5;
+      while (funcEndIdx < result.length && /[a-zA-Z0-9_]/.test(result[funcEndIdx])) {
+        funcEndIdx++;
+      }
+      const functionName = result.substring(timIdx + 5, funcEndIdx);
+
+      // Skip whitespace and find opening paren
+      let parenStart = funcEndIdx;
+      while (parenStart < result.length && /\s/.test(result[parenStart])) {
+        parenStart++;
+      }
+
+      if (parenStart >= result.length || result[parenStart] !== '(') {
+        break;
+      }
+
+      // Find matching closing paren by counting depth
+      let depth = 0;
+      let parenEnd = parenStart;
+      for (let i = parenStart; i < result.length; i++) {
+        if (result[i] === '(') depth++;
+        else if (result[i] === ')') {
+          depth--;
+          if (depth === 0) {
+            parenEnd = i;
+            break;
+          }
+        }
+      }
+
+      if (depth !== 0) break; // Unmatched parens
+
+      const argsString = result.substring(parenStart + 1, parenEnd);
+      const fullMatch = result.substring(timIdx, parenEnd + 1);
+      const bridge = this.bridges[functionName];
+
+      let replacement;
+      if (!bridge) {
+        replacement = `/* [ERROR] Bridge '${functionName}' not found */`;
+      } else {
+        let args = [];
+        if (argsString.trim()) {
+          args = this.parseArguments(argsString);
+        }
+
+        if (bridge.args >= 0 && args.length !== bridge.args) {
+          replacement = `/* [ERROR] TIM::${functionName}() expects ${bridge.args} arg(s), got ${args.length} */`;
+        } else if (bridge.csharp) {
+          replacement = bridge.csharp;
+        } else if (bridge.template) {
+          replacement = bridge.template;
+          // Handle variable argument functions (args: -1)
+          if (bridge.args === -1 && args.length > 0) {
+            // Replace {0} with all arguments joined by comma
+            replacement = replacement.replace('{0}', args.join(', '));
+          } else {
+            // Standard template replacement for fixed argument count
+            args.forEach((arg, index) => {
+              replacement = replacement.replace(`{${index}}`, arg);
+            });
+          }
+        } else {
+          replacement = fullMatch;
+        }
+      }
+
+      result = result.substring(0, timIdx) + replacement + result.substring(parenEnd + 1);
+      foundBridge = true;
+      break;
+    }
+
+    if (result !== code) {
+      return this.resolveBridges(result); // Recursive for nested bridges
+    }
+    return result;
+  },
+
+  parseArguments: function(argsString) {
+    const args = [];
+    let currentArg = "";
+    let parenDepth = 0;
+    let inQuotes = false;
+    let escapeNext = false;
+
+    for (let i = 0; i < argsString.length; i++) {
+      const char = argsString[i];
+      
+      // Handle escape sequences
+      if (escapeNext) {
+        currentArg += char;
+        escapeNext = false;
+        continue;
+      }
+      
+      // Handle backslash escape
+      if (char === "\\") {
+        currentArg += char;
+        escapeNext = true;
+        continue;
+      }
+      
+      // Toggle quote state
+      if (char === '"') {
+        inQuotes = !inQuotes;
+        currentArg += char;
+        continue;
+      }
+      
+      // Track parenthesis depth only outside quotes
+      if (!inQuotes) {
+        if (char === "(" || char === "[") {
+          parenDepth++;
+          currentArg += char;
+        } else if (char === ")" || char === "]") {
+          parenDepth--;
+          currentArg += char;
+        } else if (char === "," && parenDepth === 0) {
+          args.push(currentArg.trim());
+          currentArg = "";
+        } else {
+          currentArg += char;
+        }
+      } else {
+        // Inside quotes, add all characters as-is
+        currentArg += char;
+      }
+    }
+    if (currentArg.trim()) {
+      args.push(currentArg.trim());
+    }
+    return args;
+  },
+
   compileAction: function (oalCode) {
     if (!oalCode) return "// [Info] No action code defined.";
 
     let code = oalCode;
+
+    // =====================================================================
+    // STEP 0: PREPROCESS - Remove keywords before other transformations
+    // =====================================================================
+    code = code.replace(/\bassign\s+/gm, "");
+
+    // =====================================================================
+    // STEP 1: RESOLVE BRIDGES
+    // =====================================================================
+    code = this.resolveBridges(code);
 
 function compileChainedNavigation(code) {
   const navRegex =
@@ -18,6 +246,23 @@ function compileChainedNavigation(code) {
 
   return code;
 }
+
+    // =====================================================================
+    // STEP 2: PREPROCESS if/then/else/end if BEFORE other transformations
+    // =====================================================================
+    
+    // Convert if (...) then ... to if (...) { ...
+    code = code.replace(/\bif\s*\((.*?)\)\s*then\s*/gi, "if ($1) { ");
+    
+    // Convert else if / elif ... then to } else if (...) { ...
+    code = code.replace(/\belse\s+if\s*\((.*?)\)\s*then\s*/gi, "} else if ($1) { ");
+    code = code.replace(/\belif\s*\((.*?)\)\s*then\s*/gi, "} else if ($1) { ");
+    
+    // Convert else to } else {
+    code = code.replace(/\belse\s*(?!if|{)/gi, "} else { ");
+    
+    // Convert end if to }
+    code = code.replace(/end\s+if\s*;?/gi, "}");
 
     // =====================================================================
     // 1. EXPLICIT EVENT HANDLING (NEW REQUEST)
@@ -205,21 +450,16 @@ function compileChainedNavigation(code) {
     );
 
     // =====================================================================
-    // 4. CONTROL FLOW
+    // 4. CONTROL FLOW (Already handled in STEP 2 preprocessing)
     // =====================================================================
-
-    const regexIf = /if\s*\((.*?)\)\s*(?:then)?/gi;
-    code = code.replace(regexIf, "if ($1) {");
-
-    const regexElif = /(?:elif|else\s+if)\s*\((.*?)\)\s*(?:then)?/gi;
-    code = code.replace(regexElif, "} else if ($1) {");
-
-    code = code.replace(/^\s*else\s*$/gm, "} else {");
-    code = code.replace(/end\s*if\s*;?/gi, "}");
+    // if/then/else/end if already converted to if { } else { } syntax
 
     return code;
   },
 };
+
+
+
 
 
 
