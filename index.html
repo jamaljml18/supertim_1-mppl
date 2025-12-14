@@ -325,6 +325,44 @@
 
                 csharpCode += "}\n\n";
               }
+
+              // 2. HANDLER UNTUK FUNCTIONS (BARU)
+              else if (model.type === "function") {
+                // Konversi tipe return
+                let returnType = "void";
+                if (model.return_type) {
+                    returnType = getCSharpType(model.return_type);
+                }
+
+                // Konversi Parameter (misal: "num: integer")
+                let paramString = "";
+                if (model.parameters && model.parameters.length > 0) {
+                    paramString = model.parameters.map(p => {
+                        return `${getCSharpType(p.data_type)} ${p.name}`;
+                    }).join(", ");
+                }
+
+                // Tulis Header Fungsi C#
+                csharpCode += `public static ${returnType} ${model.name}(${paramString}) {\n`;
+
+                // Tulis Body Fungsi (Gunakan EventCompiler yang sudah ada!)
+                if (model.action_oal) {
+                    if (typeof EventCompiler !== "undefined") {
+                        const compiledAction = EventCompiler.compileAction(model.action_oal);
+                        // Indentasi agar rapi
+                        const indentedCode = compiledAction
+                          .split("\n")
+                          .map((line) => `    ${line}`)
+                          .join("\n");
+                        csharpCode += indentedCode;
+                    } else {
+                        csharpCode += `    /* ${model.action_oal} */\n`;
+                    }
+                }
+
+                csharpCode += "}\n\n";
+              }
+
               // Handle Associations
               else if (model.type === "association") {
                 csharpCode += `public class ${model.name} { /* Association Logic */ }\n\n`;
@@ -358,6 +396,8 @@
             return "string";
           case "boolean":
             return "bool";
+          case "void":
+            return "void";
           default:
             return "object";
         }

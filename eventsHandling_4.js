@@ -52,6 +52,22 @@ function compileChainedNavigation(code) {
     );
 
     // ---------------------------------------------------------
+    // D2. INSTANCE DELETION (BARU)
+    // ---------------------------------------------------------
+    // OAL: delete object instance a;
+    // C# : a.Delete();
+    code = code.replace(
+      /delete\s+object\s+instance\s+([A-Za-z0-9_]+);/g,
+      "$1.Delete();"
+    );
+
+    // OAL Short version: delete a; (jika ada)
+    code = code.replace(
+      /^\s*delete\s+([A-Za-z0-9_]+);/gm,
+      "$1.Delete();"
+    );
+
+    // ---------------------------------------------------------
     // E. INSTANCE SELECTION
     // ---------------------------------------------------------
 
