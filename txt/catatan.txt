@@ -5,7 +5,7 @@ Instance Selection	✅	Belum ada. Tidak ada regex untuk select any, select many,
 Instance Deletion	❌	Belum ada. Tidak ada regex untuk delete object instance.
 Writing Attributes	✅	Regex assign dihapus, menyisakan sintaks self.status = ... yang valid di C#.
 Reading Attributes	✅	Implisit. Contoh: self.end_time langsung terbaca sebagai properti C#.
-Instance Selection by Relationship Navigation	❌	Belum ada. Tidak ada penanganan sintaks navigasi relasi (misal: self->R1[Emp]).
+Instance Selection by Relationship Navigation	✅	Belum ada. Tidak ada penanganan sintaks navigasi relasi (misal: self->R1[Emp]).
 
 2. Relasi (Relationship)
 Komponen	Status	Penjelasan Kode
