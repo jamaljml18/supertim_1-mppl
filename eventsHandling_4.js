@@ -4,6 +4,21 @@ const EventCompiler = {
 
     let code = oalCode;
 
+function compileChainedNavigation(code) {
+  const navRegex =
+    /([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*)\s*->\s*([A-Za-z0-9_]+)\[([A-Za-z0-9_]+)\]/g;
+
+  let prev;
+  do {
+    prev = code;
+    code = code.replace(navRegex, (_, source, rel, cls) => {
+      return `${source}.GetRelated("${rel}").filter(o => o instanceof ${cls})`;
+    });
+  } while (code !== prev);
+
+  return code;
+}
+
     // =====================================================================
     // 1. EXPLICIT EVENT HANDLING (NEW REQUEST)
     // =====================================================================
@@ -57,6 +72,35 @@ const EventCompiler = {
       /select\s+many\s+([A-Za-z0-9_]+)\s+from\s+instances\s+of\s+([A-Za-z0-9_]+)\s+where\s*\((.*?)\);/g,
       "var $1 = Population.$2.filter(item => $3);"
     );
+
+    // ---------------------------------------------------------
+    // E2. INSTANCE SELECTION BY RELATIONSHIP NAVIGATION 
+    // ---------------------------------------------------------
+
+    // SELECT ONE by Relationship Navigation
+    code = code.replace(
+      /select\s+one\s+([A-Za-z0-9_]+)\s+from\s+([A-Za-z0-9_]+)\s+across\s+([A-Za-z0-9_]+);/g,
+      "var $1 = ($2.GetRelated('$3')[0]) || null;"
+    );
+
+    // SELECT MANY by Relationship Navigation
+    code = code.replace(
+      /select\s+many\s+([A-Za-z0-9_]+)\s+from\s+([A-Za-z0-9_]+)\s+across\s+([A-Za-z0-9_]+)\s+where\s*\((.*?)\);/g,
+      "var $1 = $2.GetRelated('$3').filter(item => $4);"
+    );
+
+    code = code.replace(
+      /select\s+many\s+([A-Za-z0-9_]+)\s+from\s+([A-Za-z0-9_]+)\s+across\s+([A-Za-z0-9_]+);/g,
+      "var $1 = $2.GetRelated('$3');"
+    );
+
+    // SELECT ANY by Relationship Navigation
+    code = code.replace(
+      /select\s+any\s+([A-Za-z0-9_]+)\s+from\s+([A-Za-z0-9_]+)\s+across\s+([A-Za-z0-9_]+);/g,
+      "var $1 = ($2.GetRelated('$3')[0]) || null;"
+    );
+    
+    code = compileChainedNavigation(code);
 
     // ---------------------------------------------------------
     // F. CREATING RELATIONSHIP INSTANCE
@@ -160,5 +204,6 @@ const EventCompiler = {
     return code;
   },
 };
+
 
 
