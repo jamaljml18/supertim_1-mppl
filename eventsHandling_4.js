@@ -1,4 +1,7 @@
 const EventCompiler = {
+  // =====================================================================
+  // 1. TEAM'S BRIDGE INFRASTRUCTURE
+  // =====================================================================
   bridges: {
     "current_date": { type: "datetime", args: 0, csharp: "DateTime.Today" },
     "current_time": { type: "datetime", args: 0, csharp: "DateTime.Now" },
@@ -70,7 +73,7 @@ const EventCompiler = {
     "get_hash": { type: "misc", args: 1, template: "\"{0}\".GetHashCode().ToString()" },
   },
 
-  resolveBridges: function(code) {
+  resolveBridges: function (code) {
     let result = code;
     let iterations = 0;
     const maxIterations = 15;
@@ -122,7 +125,9 @@ const EventCompiler = {
 
       let replacement;
       if (!bridge) {
-        replacement = `/* [ERROR] Bridge '${functionName}' not found */`;
+        // [MODIFIED] Do NOT error yet, specific Timers might handle this later? 
+        // NO, specific timers handled BEFORE this function.
+        replacement = `/* [ERROR] Bridge '${functionName}' not found in team library */`;
       } else {
         let args = [];
         if (argsString.trim()) {
@@ -161,7 +166,7 @@ const EventCompiler = {
     return result;
   },
 
-  parseArguments: function(argsString) {
+  parseArguments: function (argsString) {
     const args = [];
     let currentArg = "";
     let parenDepth = 0;
@@ -170,29 +175,25 @@ const EventCompiler = {
 
     for (let i = 0; i < argsString.length; i++) {
       const char = argsString[i];
-      
-      // Handle escape sequences
+
       if (escapeNext) {
         currentArg += char;
         escapeNext = false;
         continue;
       }
-      
-      // Handle backslash escape
+
       if (char === "\\") {
         currentArg += char;
         escapeNext = true;
         continue;
       }
-      
-      // Toggle quote state
+
       if (char === '"') {
         inQuotes = !inQuotes;
         currentArg += char;
         continue;
       }
-      
-      // Track parenthesis depth only outside quotes
+
       if (!inQuotes) {
         if (char === "(" || char === "[") {
           parenDepth++;
@@ -207,7 +208,6 @@ const EventCompiler = {
           currentArg += char;
         }
       } else {
-        // Inside quotes, add all characters as-is
         currentArg += char;
       }
     }
@@ -217,67 +217,123 @@ const EventCompiler = {
     return args;
   },
 
+  // =====================================================================
+  // 2. MAIN COMPILE FUNCTION (MERGED)
+  // =====================================================================
   compileAction: function (oalCode) {
     if (!oalCode) return "// [Info] No action code defined.";
 
     let code = oalCode;
+    // auto detect timer
+    const USE_STRICT_TIMER =
+      /create\s+timer\s+/i.test(oalCode) ||
+      /TIM::timer_/i.test(oalCode);
+
+    function compileChainedNavigation(code) {
+      const navRegex =
+        /([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*)\s*->\s*([A-Za-z0-9_]+)\[([A-Za-z0-9_]+)\]/g;
+
+      let prev;
+      do {
+        prev = code;
+        code = code.replace(navRegex, (_, source, rel, cls) => {
+          return `${source}.GetRelated("${rel}").filter(o => o instanceof ${cls})`;
+        });
+      } while (code !== prev);
+
+      return code;
+    }
 
     // =====================================================================
-    // STEP 0: PREPROCESS - Remove keywords before other transformations
+    // STEP 0: PREPROCESS - Remove keywords
     // =====================================================================
     code = code.replace(/\bassign\s+/gm, "");
 
     // =====================================================================
-    // STEP 1: RESOLVE BRIDGES
+    //  B. TIMERS & TIM:: BRIDGE 
+    // =====================================================================
+    // PENTING: Logika ini dijalankan SEBELUM 'resolveBridges' milik tim.
+    // Ini mencegah resolveBridges mendeteksi TIM::timer_start sebagai bridge error.
+    if (USE_STRICT_TIMER) {
+      // 1. create timer (PASSIVE creation, OAL Standard)
+      code = code.replace(
+        /create\s+timer\s+([A-Za-z0-9_]+)\s+of\s+\((.*?)\)\s+generating\s+([A-Za-z0-9_]+);/g,
+        "var $1 = TimerService.Create($3, $2, false);"
+      );
+
+      // 2. TIM::timer_start (ACTIVE schedule, Bridge)
+      code = code.replace(
+        /([A-Za-z0-9_]+)\s*=\s*TIM::timer_start\s*\(\s*microseconds:\s*([0-9A-Za-z_]+)\s*,\s*event_inst:\s*([A-Za-z0-9_]+)\s*\);/g,
+        "var $1 = TimerService.Schedule($3, (int)($2 / 1000), false);"
+      );
+
+      // 3. TIM::timer_start_recurring
+      code = code.replace(
+        /([A-Za-z0-9_]+)\s*=\s*TIM::timer_start_recurring\s*\(\s*microseconds:\s*([0-9A-Za-z_]+)\s*,\s*event_inst:\s*([A-Za-z0-9_]+)\s*\);/g,
+        "var $1 = TimerService.Schedule($3, (int)($2 / 1000), true);"
+      );
+
+      // 4. TIM::timer_cancel
+      code = code.replace(
+        /(?:[A-Za-z0-9_]+\s*=\s*)?TIM::timer_cancel\s*\(\s*timer_inst_ref:\s*([A-Za-z0-9_]+)\s*\);/g,
+        "TimerService.Cancel($1);"
+      );
+      code = code.replace(
+        /cancel\s+([A-Za-z0-9_]+)\s+from\s+([A-Za-z0-9_.]+);/g,
+        "TimerService.Cancel($1);"
+      );
+
+      // 5. Utilities
+      code = code.replace(
+        /TIM::timer_remaining_time\s*\(\s*timer_inst_ref:\s*([A-Za-z0-9_]+)\s*\)/g,
+        "TimerService.GetRemainingTime($1)"
+      );
+      code = code.replace(
+        /(?:[A-Za-z0-9_]+\s*=\s*)?TIM::timer_reset_time\s*\(\s*timer_inst_ref:\s*([A-Za-z0-9_]+)\s*,\s*microseconds:\s*([0-9A-Za-z_]+)\s*\);/g,
+        "TimerService.ResetTime($1, (int)($2 / 1000));"
+      );
+      code = code.replace(
+        /(?:[A-Za-z0-9_]+\s*=\s*)?TIM::timer_add_time\s*\(\s*timer_inst_ref:\s*([A-Za-z0-9_]+)\s*,\s*microseconds:\s*([0-9A-Za-z_]+)\s*\);/g,
+        "TimerService.AddTime($1, (int)($2 / 1000));"
+      );
+    } else {
+      // Fallback stub untuk timer lama tim (jika ada)
+      code = code.replace(
+        /create\s+timer\s+([A-Za-z0-9_]+)\s+of\s+\((.*?)\)\s+generating\s+([A-Za-z0-9_]+);/g,
+        "// [DISABLED] create timer $1 ($3, $2);"
+      );
+    }
+
+    // =====================================================================
+    // STEP 1: RESOLVE BRIDGES 
     // =====================================================================
     code = this.resolveBridges(code);
 
-function compileChainedNavigation(code) {
-  const navRegex =
-    /([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*)\s*->\s*([A-Za-z0-9_]+)\[([A-Za-z0-9_]+)\]/g;
-
-  let prev;
-  do {
-    prev = code;
-    code = code.replace(navRegex, (_, source, rel, cls) => {
-      return `${source}.GetRelated("${rel}").filter(o => o instanceof ${cls})`;
-    });
-  } while (code !== prev);
-
-  return code;
-}
-
     // =====================================================================
-    // STEP 2: PREPROCESS if/then/else/end if BEFORE other transformations
+    // STEP 2: PREPROCESS CONTROL FLOW
     // =====================================================================
-    
+
     // Convert if (...) then ... to if (...) { ...
     code = code.replace(/\bif\s*\((.*?)\)\s*then\s*/gi, "if ($1) { ");
-    
+
     // Convert else if / elif ... then to } else if (...) { ...
     code = code.replace(/\belse\s+if\s*\((.*?)\)\s*then\s*/gi, "} else if ($1) { ");
     code = code.replace(/\belif\s*\((.*?)\)\s*then\s*/gi, "} else if ($1) { ");
-    
+
     // Convert else to } else {
     code = code.replace(/\belse\s*(?!if|{)/gi, "} else { ");
-    
+
     // Convert end if to }
     code = code.replace(/end\s+if\s*;?/gi, "}");
 
     // =====================================================================
-    // 1. EXPLICIT EVENT HANDLING (NEW REQUEST)
+    // 1. EXPLICIT EVENT HANDLING
     // =====================================================================
 
     // A. CREATE EVENT INSTANCE (Explicit)
     code = code.replace(
       /create\s+event\s+instance\s+([A-Za-z0-9_]+)\s+of\s+([A-Za-z0-9_]+)\s+to\s+([A-Za-z0-9_.]+);/g,
       "var $1 = new Events.$2(); $1.Target = $3;"
-    );
-
-    // B. CREATE TIMER (Explicit)
-    code = code.replace(
-      /create\s+timer\s+([A-Za-z0-9_]+)\s+of\s+\((.*?)\)\s+generating\s+([A-Za-z0-9_]+);/g,
-      "var $1 = $3.Target.StartTimer($3, $2);"
     );
 
     // C. GENERATE EVENT INSTANCE (Explicit)
@@ -296,170 +352,249 @@ function compileChainedNavigation(code) {
       "var $1 = new $2();"
     );
 
-    // ---------------------------------------------------------
-    // D2. INSTANCE DELETION (BARU)
-    // ---------------------------------------------------------
-    // OAL: delete object instance a;
-    // C# : a.Delete();
+    // D2. INSTANCE DELETION
     code = code.replace(
       /delete\s+object\s+instance\s+([A-Za-z0-9_]+);/g,
       "$1.Delete();"
     );
-
-    // OAL Short version: delete a; (jika ada)
     code = code.replace(
       /^\s*delete\s+([A-Za-z0-9_]+);/gm,
       "$1.Delete();"
     );
 
-    // ---------------------------------------------------------
     // E. INSTANCE SELECTION
-    // ---------------------------------------------------------
-
-    // SELECT ANY
     code = code.replace(
       /select\s+any\s+([A-Za-z0-9_]+)\s+from\s+instances\s+of\s+([A-Za-z0-9_]+);/g,
       "var $1 = Population.$2[0] || null;"
     );
-
-    // SELECT ONE with WHERE
     code = code.replace(
       /select\s+one\s+([A-Za-z0-9_]+)\s+from\s+instances\s+of\s+([A-Za-z0-9_]+)\s+where\s*\((.*?)\);/g,
       "var $1 = Population.$2.find(item => $3) || null;"
     );
-
-    // SELECT MANY with WHERE
     code = code.replace(
       /select\s+many\s+([A-Za-z0-9_]+)\s+from\s+instances\s+of\s+([A-Za-z0-9_]+)\s+where\s*\((.*?)\);/g,
       "var $1 = Population.$2.filter(item => $3);"
     );
 
-    // ---------------------------------------------------------
-    // E2. INSTANCE SELECTION BY RELATIONSHIP NAVIGATION 
-    // ---------------------------------------------------------
-
-    // SELECT ONE by Relationship Navigation
+    // E2. NAVIGATION
     code = code.replace(
       /select\s+one\s+([A-Za-z0-9_]+)\s+from\s+([A-Za-z0-9_]+)\s+across\s+([A-Za-z0-9_]+);/g,
       "var $1 = ($2.GetRelated('$3')[0]) || null;"
     );
-
-    // SELECT MANY by Relationship Navigation
     code = code.replace(
       /select\s+many\s+([A-Za-z0-9_]+)\s+from\s+([A-Za-z0-9_]+)\s+across\s+([A-Za-z0-9_]+)\s+where\s*\((.*?)\);/g,
       "var $1 = $2.GetRelated('$3').filter(item => $4);"
     );
-
     code = code.replace(
       /select\s+many\s+([A-Za-z0-9_]+)\s+from\s+([A-Za-z0-9_]+)\s+across\s+([A-Za-z0-9_]+);/g,
       "var $1 = $2.GetRelated('$3');"
     );
-
-    // SELECT ANY by Relationship Navigation
     code = code.replace(
       /select\s+any\s+([A-Za-z0-9_]+)\s+from\s+([A-Za-z0-9_]+)\s+across\s+([A-Za-z0-9_]+);/g,
       "var $1 = ($2.GetRelated('$3')[0]) || null;"
     );
-    
     code = compileChainedNavigation(code);
 
-    // ---------------------------------------------------------
-    // F. CREATING RELATIONSHIP INSTANCE
-    // ---------------------------------------------------------
-    // OAL: create relationship instance r1 between a and b of R1;
+    // F. RELATIONSHIP INSTANCE
     code = code.replace(
       /create\s+relationship\s+instance\s+([A-Za-z0-9_]+)\s+between\s+([A-Za-z0-9_]+)\s+and\s+([A-Za-z0-9_]+)\s+of\s+([A-Za-z0-9_]+);/g,
       "var $1 = $2.RelateTo($3, '$4');"
     );
-
-    // ---------------------------------------------------------
-    // F2. DELETING RELATIONSHIP INSTANCE
-    // ---------------------------------------------------------
-
-    // delete relationship instance r1;
     code = code.replace(
       /delete\s+relationship\s+instance\s+([A-Za-z0-9_]+);/g,
       "$1.Delete();"
     );
-
-    // delete relationship instance r1 between a and b of R1;
     code = code.replace(
       /delete\s+relationship\s+instance\s+([A-Za-z0-9_]+)\s+between\s+([A-Za-z0-9_]+)\s+and\s+([A-Za-z0-9_]+)\s+of\s+([A-Za-z0-9_]+);/g,
       "$2.UnrelateFrom($3, '$4');"
     );
 
-    // ---------------------------------------------------------
-    // G. ASSIGNMENT
-    // ---------------------------------------------------------
-    code = code.replace(/^\s*assign\s+/gm, "");
-
-    // G2. RELATE
+    // G. ASSIGNMENT & RELATE
     code = code.replace(
       /relate\s+([A-Za-z0-9_.]+)\s+to\s+([A-Za-z0-9_]+)\s+across\s+([A-Za-z0-9_]+);/g,
       '$1.RelateTo($2, "$3");'
     );
 
-    // H. CANCEL TIMER
+    // =====================================================================
+    // 5. INTER-COMPONENT MESSAGING 
+    // =====================================================================
+    // 1. Explicit Targeting
     code = code.replace(
-      /cancel\s+([A-Za-z0-9_]+)\s+from\s+([A-Za-z0-9_.]+);/g,
-      "$2.CancelTimer(Events.$1);"
+      /(?:send\s+)?([A-Za-z0-9_]+)::([A-Za-z0-9_]+)\s*\((.*?)\)\s+to\s+([A-Za-z0-9_]+);/g,
+      "$4.$1.$2($3);"
+    );
+    // 2. Implicit Targeting
+    code = code.replace(
+      /(?:send\s+)?([A-Za-z0-9_]+)::([A-Za-z0-9_]+)\s*\((.*?)\)(?!\s+to\b)/g,
+      "this.$1.$2($3)"
     );
 
-    // =====================================================================
-    // 3. DATA ACCESS & LOGIC
-    // =====================================================================
-
-    // Access Event Data
-    code = code.replace(/\brcvd_evt\.([a-zA-Z0-9_]+)\b/g, "eventArgs.$1");
-
-    // Logical Operators
-    code = code.replace(/\s+and\s+/gi, " && ");
-    code = code.replace(/\s+or\s+/gi, " || ");
-    code = code.replace(/\s+not\s+/gi, " !");
-
-    // =====================================================================
-    // 3.b DATE & TIME
-    // =====================================================================
-
-    code = code.replace(/\bCurrentTime\b/gi, "DateTime.Now");
-    code = code.replace(/\bnow\(\)/gi, "DateTime.Now");
-    code = code.replace(/\bcurrent\s+time\b/gi, "DateTime.Now");
-
-    code = code.replace(/\bCurrentDate\b/gi, "DateTime.Today");
-    code = code.replace(/\bcurrent_date\b/gi, "DateTime.Today");
-    code = code.replace(/\bcurrent\s+date\b/gi, "DateTime.Today");
-
-    code = code.replace(
-      /add_days\s*\(\s*([A-Za-z0-9_.]+)\s*,\s*([0-9]+)\s*\)/gi,
-      "$1.AddDays($2)"
-    );
-
-    code = code.replace(
-      /dateadd\s*\(\s*([A-Za-z0-9_.]+)\s*,\s*([0-9]+)\s*\)/gi,
-      "$1.AddDays($2)"
-    );
-
-    code = code.replace(
-      /([A-Za-z0-9_.]+)\s*\+\s*([0-9]+)\s+days/gi,
-      "$1.AddDays($2)"
-    );
-
-    code = code.replace(
-      /date_parse\s*\(\s*(.*?)\s*\)/gi,
-      "DateTime.Parse($1)"
-    );
-
-    // =====================================================================
-    // 4. CONTROL FLOW (Already handled in STEP 2 preprocessing)
-    // =====================================================================
-    // if/then/else/end if already converted to if { } else { } syntax
+    // Simpan flag untuk GetRuntimeHelpers
+    this._usesStrictTimer = USE_STRICT_TIMER;
 
     return code;
   },
+
+  // =====================================================================
+  // 3. get runtime helpers
+  // =====================================================================
+  GetRuntimeHelpers: function () {
+    if (!this._usesStrictTimer) return "";
+
+    return `
+using System;
+using System.Collections.Concurrent;
+using System.Threading;
+using System.Threading.Tasks;
+
+// ============================================================================
+// OAL RUNTIME INFRASTRUCTURE (STRICT SEMANTICS)
+// ============================================================================
+
+public static class TimerService {
+    public enum TimerStatus { Created, Running, Paused, Completed, Cancelled }
+
+    private class TimerData {
+        public CancellationTokenSource Cts { get; set; }
+        public DateTime EndTime { get; set; } 
+        public bool IsRecurring { get; set; }
+        public int IntervalMs { get; set; }
+        public dynamic EventInstance { get; set; }
+        public TimerStatus Status { get; set; }
+        public int RemainingAtPause { get; set; } 
+    }
+
+    private static ConcurrentDictionary<Guid, TimerData> _timers = 
+        new ConcurrentDictionary<Guid, TimerData>();
+
+    private static void RunTimerInternal(Guid timerId, TimerData data, int delayMs) {
+        if (data.Status != TimerStatus.Running) return;
+
+        Task.Run(async () => {
+            try {
+                await Task.Delay(delayMs, data.Cts.Token);
+
+                if (!data.Cts.Token.IsCancellationRequested && data.Status == TimerStatus.Running) {
+                    EventQueue.Enqueue(data.EventInstance);
+
+                    if (data.IsRecurring) {
+                        var newCts = new CancellationTokenSource();
+                        data.Cts = newCts;
+                        data.EndTime = DateTime.Now.AddMilliseconds(data.IntervalMs);
+                        RunTimerInternal(timerId, data, data.IntervalMs);
+                    } else {
+                        data.Status = TimerStatus.Completed;
+                        _timers.TryRemove(timerId, out _);
+                    }
+                }
+            } catch (TaskCanceledException) {
+                // Normal
+            }
+        });
+    }
+
+    public static Guid Create(dynamic eventInstance, int delayMs, bool isRecurring) {
+        Guid timerId = Guid.NewGuid();
+        var data = new TimerData { 
+            Cts = new CancellationTokenSource(),
+            EndTime = DateTime.MinValue,
+            IsRecurring = isRecurring,
+            IntervalMs = delayMs,
+            EventInstance = eventInstance,
+            Status = TimerStatus.Created,
+            RemainingAtPause = delayMs
+        };
+        _timers.TryAdd(timerId, data);
+        return timerId;
+    }
+
+    public static bool Start(Guid timerId) {
+        if (_timers.TryGetValue(timerId, out TimerData data)) {
+            if (data.Status == TimerStatus.Created || data.Status == TimerStatus.Paused) {
+                int duration = data.RemainingAtPause > 0 ? data.RemainingAtPause : data.IntervalMs;
+                data.Status = TimerStatus.Running;
+                data.EndTime = DateTime.Now.AddMilliseconds(duration);
+                data.Cts = new CancellationTokenSource();
+                RunTimerInternal(timerId, data, duration);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static Guid Schedule(dynamic eventInstance, int delayMs, bool isRecurring) {
+        var id = Create(eventInstance, delayMs, isRecurring);
+        Start(id);
+        return id;
+    }
+
+    public static bool Cancel(Guid timerId) {
+        if (_timers.TryRemove(timerId, out TimerData data)) {
+            data.Status = TimerStatus.Cancelled;
+            data.Cts.Cancel();
+            data.Cts.Dispose();
+            return true;
+        }
+        return false;
+    }
+
+    public static int GetRemainingTime(Guid timerId) {
+        if (_timers.TryGetValue(timerId, out TimerData data)) {
+            if (data.Status == TimerStatus.Running) {
+                var val = (data.EndTime - DateTime.Now).TotalMilliseconds;
+                return val > 0 ? (int)(val * 1000) : 0;
+            }
+            if (data.Status == TimerStatus.Created || data.Status == TimerStatus.Paused) {
+                return data.RemainingAtPause * 1000;
+            }
+        }
+        return 0;
+    }
+
+    public static bool AddTime(Guid timerId, int extraMs) {
+        if (_timers.TryGetValue(timerId, out TimerData data)) {
+            if (data.Status == TimerStatus.Running) {
+                data.Cts.Cancel(); 
+                double currentRemaining = (data.EndTime - DateTime.Now).TotalMilliseconds;
+                if (currentRemaining < 0) currentRemaining = 0;
+                int newDelay = (int)(currentRemaining + extraMs);
+
+                data.Cts = new CancellationTokenSource();
+                data.EndTime = DateTime.Now.AddMilliseconds(newDelay);
+                RunTimerInternal(timerId, data, newDelay);
+            } else {
+                data.IntervalMs += extraMs;
+                data.RemainingAtPause += extraMs;
+            }
+            return true;
+        }
+        return false;
+    }
+
+    public static bool ResetTime(Guid timerId, int newMs) {
+        if (_timers.TryGetValue(timerId, out TimerData data)) {
+            if (data.Status == TimerStatus.Running) {
+                data.Cts.Cancel();
+                data.Cts = new CancellationTokenSource();
+                data.EndTime = DateTime.Now.AddMilliseconds(newMs);
+                if (data.IsRecurring) data.IntervalMs = newMs;
+                RunTimerInternal(timerId, data, newMs);
+            } else {
+                data.IntervalMs = newMs;
+                data.RemainingAtPause = newMs;
+            }
+            return true;
+        }
+        return false;
+    }
+}
+
+public static class EventQueue {
+    public static void Enqueue(dynamic evt) {
+        Console.WriteLine($"[EventQueue] Enqueued Event Target: {evt.Target}");
+        // ... Dispatch Logic ...
+    }
+}
+`;
+  }
 };
-
-
-
-
-
-

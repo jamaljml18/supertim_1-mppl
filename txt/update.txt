@@ -229,3 +229,76 @@ Dokumentasi dibuat: 15 Desember 2025 | Status: ✅ PRODUCTION READY
 ================================================================================
 END OF DOCUMENTATION
 ================================================================================
+
+================================================================================
+DOKUMENTASI FITUR STRICT TIMERS & INTER-MESSAGING
+================================================================================
+Tanggal: 15 Desember 2025 | Versi: 1.1 | Penulis: User & AI Assistant
+
+PENGENALAN
+Modul ini juga telah diperluas untuk mendukung semantik "Strict Timer" OAL
+yang memisahkan antara pembuatan (allocation) dan penjadwalan (scheduling) timer,
+serta mendukung pengiriman pesan antar-komponen (Port Messaging).
+
+KOMPONEN UTAMA (Tambahan)
+- TimerService: Implementasi C# runtime untuk manajemen timer (Thread-safe).
+- EventQueue: Antrian event terpusat untuk dispatching.
+- Auto-Detection: Mendeteksi penggunaan timer di OAL secara otomatis.
+
+FITUR 1: STRICT OAL TIMER SEMANTICS
+===================================
+Kami membedakan dua operasi timer utama sesuai standar OAL:
+
+1. Passive Timer Creation (`create timer`)
+   - OAL: `create timer t1 of (30) generating e1;`
+   - C#:  `var t1 = TimerService.Create(e1, 30, false);`
+   - Fungsi: Hanya mengalokasikan timer ID dan data, status = Created. Belum jalan.
+
+2. Active Timer Scheduling (`TIM::timer_start`) - Bridge
+   - OAL: `t1 = TIM::timer_start(microseconds: 5000, event_inst: e1);`
+   - C#:  `var t1 = TimerService.Schedule(e1, 5, false);`
+   - Fungsi: Mengalokasikan DAN langsung menjalankan timer.
+
+3. Timer Utilities
+   - `cancel t1` -> `TimerService.Cancel(t1)`
+   - `TIM::timer_remaining_time(t1)` -> `TimerService.GetRemainingTime(t1)`
+   - `TIM::timer_reset_time(t1)` -> `TimerService.ResetTime(t1)`
+   - `TIM::timer_add_time(t1)` -> `TimerService.AddTime(t1)`
+
+FITUR 2: INTER-COMPONENT MESSAGING
+==================================
+Mendukung sintaks pengiriman pesan via Port atau Interface:
+
+1. Explicit Target
+   - OAL: `send IO::Log(msg: "Test") to console;`
+   - C#:  `console.IO.Log(msg: "Test");`
+
+2. Implicit Target (Local/This)
+   - OAL: `IO::Log(msg: "Test");`
+   - C#:  `this.IO.Log(msg: "Test");`
+
+3. Assignment Support
+   - OAL: `x = Math::Calc(val: 10);`
+   - C#:  `x = this.Math.Calc(val: 10);`
+
+FITUR 3: RUNTIME INJECTION
+==========================
+Compiler sekarang cerdas (Context-Aware):
+- Jika OAL mengandung kata kunci `create timer` atau `TIM::timer_`,
+  maka blok kode C# Runtime (`TimerService` & `EventQueue`) otomatis disisipkan.
+- Jika tidak ada timer, runtime tidak disisipkan (Zero Overhead).
+
+MERGE STRATEGY (PENTING)
+========================
+Untuk memastikan kompatibilitas dengan "Bridge Features" tim:
+1. Regex Timer dijalankan LEBIH DULU daripada `resolveBridges`.
+   Alasan: `TIM::timer_start` harus diubah menjadi `TimerService.Schedule` sebelum 
+   bridge resolver melihatnya, agar tidak dianggap "Unknown Bridge".
+2. Generic Bridges (`TIM::log`, dll) dijalankan belakangan.
+
+HASIL TESTING
+=============
+✅ Passive Timer (Create only) -> Passed
+✅ Active Timer (Schedule) -> Passed
+✅ Messaging (Explicit/Implicit) -> Passed
+✅ Bridge Compatibility -> Passed (Tested with test_merge_verify.js)

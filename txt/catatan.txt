@@ -17,8 +17,7 @@ Komponen	Status	Penjelasan Kode
 Creating Events	✅	Regex baru: create event instance ... sudah ditangani.
 Generating Events	✅	Regex baru: generate ... (baik langsung maupun via handle) sudah ditangani.
 Accessing Event Data	✅	Regex: rcvd_evt diubah menjadi eventArgs.
-Timers	✅	Regex: create timer ... diubah menjadi .StartTimer(...).
-Cancel Timer	✅	Regex: cancel ... diubah menjadi .CancelTimer(...).
+Timers ✅ — Auto-detected: create timer ... → TimerService.Create(...) (pasif, tidak langsung berjalan); TIM::timer_start(...) → TimerService.Schedule(...) (aktif, langsung berjalan), runtime TimerService di-inject hanya jika timer digunakan.Cancel Timer	✅	Regex: cancel ... diubah menjadi .CancelTimer(...).
 
 4. Logika & Kontrol
 Komponen	Status	Penjelasan Kode
@@ -31,7 +30,7 @@ Komponen	Status	Penjelasan Kode
 Operations	❌	Belum ada. Loop JSON kamu hanya membaca states. Tidak ada pembacaan operations di level kelas.
 Bridges	✅	IMPLEMENTED. 59 bridges across 8 categories (DateTime, String, Collection, Math, Conversion, Logging, File, Misc). Uses TIM:: prefix for all bridge calls. Sequential resolution with max 10 iterations for nested bridges. Depth-tracked argument parsing to preserve all arguments correctly.
 Functions ✅	Compiler sekarang bisa membaca model function global dari JSON, menerjemahkan parameter, menangani tipe data (termasuk perbaikan void tadi), dan mengonversi isi fungsinya menjadi static method C#..
-Inter-component Messaging	❌	Belum ada. Tidak ada penanganan Port atau Interface messages.
+Inter-component Messaging ✅ Regex: Port::Msg(...) to Target diubah menjadi Target.Port.Msg(...), dan Port::Msg(...) (implisit) diubah menjadi this.Port.Msg(...).
 Object Action Language for Non-State Actions	❌	Belum ada. Karena parser kamu hanya melihat action_oal di dalam states, OAL di tempat lain (operasi/fungsi) tidak akan terkompilasi.
 Date and Time	✅	Parsial. Kamu menggunakan CurrentTime di OAL, tapi compiler tidak mengubahnya menjadi DateTime.Now. C# akan menganggap itu variabel lokal yang mungkin tidak ada.
 
