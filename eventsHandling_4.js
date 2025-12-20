@@ -346,19 +346,47 @@ const EventCompiler = {
     // 2. STANDARD OAL COMMANDS
     // =====================================================================
 
+    
     // D. INSTANCE CREATION
     code = code.replace(
       /create\s+object\s+instance\s+([A-Za-z0-9_]+)\s+of\s+([A-Za-z0-9_]+);/g,
       "var $1 = new $2();"
     );
 
-    // D2. INSTANCE DELETION
+    // ======================================================
+    // RELATIONSHIP HANDLING (FINAL)
+    // ======================================================
+
+    // ------------------------------------------------------
+    // CREATE relationship instance (EXPLICIT, with variable)
+    // OAL: assign R1 = create relationship instance R4 between A and B of AB;
+    // ------------------------------------------------------
     code = code.replace(
-      /delete\s+object\s+instance\s+([A-Za-z0-9_]+);/g,
+      /([A-Za-z0-9_]+)\s*=\s*create\s+relationship\s+instance\s+([A-Za-z0-9_]+)\s+between\s+([A-Za-z0-9_]+)\s+and\s+([A-Za-z0-9_]+)\s+of\s+([A-Za-z0-9_]+);/g,
+      "var $1 = $3.RelateTo($4, '$5');"
+      );
+
+    // ------------------------------------------------------
+    // DELETE relationship instance (BY INSTANCE VARIABLE)
+    // OAL: delete relationship instance R1;
+    // ------------------------------------------------------
+    code = code.replace(
+      /delete\s+relationship\s+instance\s+([A-Za-z0-9_]+);/g,
       "$1.Delete();"
     );
+
+    // ------------------------------------------------------
+    // DELETE relationship instance (BY ENDS)
+    // OAL: delete relationship instance R4 between A and B of AB;
+    // ------------------------------------------------------
     code = code.replace(
-      /^\s*delete\s+([A-Za-z0-9_]+);/gm,
+      /delete\s+relationship\s+instance\s+([A-Za-z0-9_]+)\s+between\s+([A-Za-z0-9_]+)\s+and\s+([A-Za-z0-9_]+)\s+of\s+([A-Za-z0-9_]+);/g,
+      "$2.UnrelateFrom($3, '$4');"
+    );
+
+      // D2. INSTANCE DELETION
+    code = code.replace(
+      /delete\s+object\s+instance\s+([A-Za-z0-9_]+);/g,
       "$1.Delete();"
     );
 
@@ -395,19 +423,6 @@ const EventCompiler = {
     );
     code = compileChainedNavigation(code);
 
-    // F. RELATIONSHIP INSTANCE
-    code = code.replace(
-      /create\s+relationship\s+instance\s+([A-Za-z0-9_]+)\s+between\s+([A-Za-z0-9_]+)\s+and\s+([A-Za-z0-9_]+)\s+of\s+([A-Za-z0-9_]+);/g,
-      "var $1 = $2.RelateTo($3, '$4');"
-    );
-    code = code.replace(
-      /delete\s+relationship\s+instance\s+([A-Za-z0-9_]+);/g,
-      "$1.Delete();"
-    );
-    code = code.replace(
-      /delete\s+relationship\s+instance\s+([A-Za-z0-9_]+)\s+between\s+([A-Za-z0-9_]+)\s+and\s+([A-Za-z0-9_]+)\s+of\s+([A-Za-z0-9_]+);/g,
-      "$2.UnrelateFrom($3, '$4');"
-    );
 
     // G. ASSIGNMENT & RELATE
     code = code.replace(
