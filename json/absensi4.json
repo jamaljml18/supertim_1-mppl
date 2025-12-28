@@ -1,0 +1,148 @@
+{
+  "type": "subsystem",
+  "sub_id": "s_absensi",
+  "sub_name": "SistemAbsensi",
+  "model": [
+    {
+      "type": "class",
+      "class_id": "101",
+      "class_name": "Employee",
+      "KL": "Emp",
+      "attributes": [
+        { "attribute_name": "employee_id", "data_type": "unique_id" },
+        { "attribute_name": "name", "data_type": "string" },
+        { "attribute_name": "email", "data_type": "string" }
+      ]
+    },
+    {
+      "type": "class",
+      "class_id": "102",
+      "class_name": "Schedule",
+      "KL": "Sch",
+      "attributes": [
+        { "attribute_name": "schedule_id", "data_type": "unique_id" },
+        { "attribute_name": "start_time", "data_type": "integer" },
+        { "attribute_name": "end_time", "data_type": "integer" }
+      ]
+    },
+    {
+      "type": "class",
+      "class_id": "103",
+      "class_name": "Attendance",
+      "KL": "Att",
+      "attributes": [
+        { "attribute_name": "attendance_id", "data_type": "unique_id" },
+        { "attribute_name": "employee_id", "data_type": "unique_id" },
+        { "attribute_name": "schedule_id", "data_type": "unique_id" },
+        { "attribute_name": "end_time", "data_type": "integer" },
+        {
+          "attribute_name": "status",
+          "data_type": "state",
+          "default_value": "Pending"
+        },
+        { "attribute_name": "actual_time", "data_type": "integer" },
+        { "attribute_name": "permission_uploaded", "data_type": "boolean" }
+      ],
+      "states": [
+        {
+          "state_id": "1",
+          "state_name": "Pending",
+          "action_oal": "self.status = \"Pending\";\nself.permission_uploaded = false;\ncreate event instance evt_timeout of Att3:'schedule_end_passed' to self;\ncreate timer t_timeout of (self.end_time + 30) generating evt_timeout;"
+        },
+        {
+          "state_id": "2",
+          "state_name": "Present",
+          "action_oal": "self.status = \"Present\";\nself.actual_time = rcvd_evt.time;\ncancel t_timeout from self;\ngenerate NOTIF1:'Email'(msg:'Hadir tepat waktu') to NOTIF;"
+        },
+        {
+          "state_id": "3",
+          "state_name": "Late",
+          "action_oal": "self.status = \"Late\";\nself.actual_time = rcvd_evt.time;\ncancel t_timeout from self;\ngenerate NOTIF1:'Email'(msg:'Terlambat') to NOTIF;"
+        },
+        {
+          "state_id": "4",
+          "state_name": "Absent",
+          "action_oal": "self.status = \"Absent\";\ngenerate NOTIF1:'Email'(msg:'Alfa') to NOTIF;"
+        },
+        {
+          "state_id": "5",
+          "state_name": "Permission",
+          "action_oal": "self.status = \"Permission\";\nself.permission_uploaded = true;\ncancel t_timeout from self;\ngenerate NOTIF1:'Email'(msg:'Izin diproses') to NOTIF;"
+        },
+        {
+          "state_id": "8",
+          "state_name": "Canceled",
+          "action_oal": "self.status = \"Canceled\";\nif (TIM::getCurrentTime() < self.end_time) then\n  create event instance evt_recheck of Att3:'schedule_end_passed' to self;\n  create timer t_recheck of (self.end_time + 5) generating evt_recheck;\nend if;\ngenerate NOTIF1:'Email'(msg:'Izin dibatalkan') to NOTIF;"
+        }
+      ]
+    },
+    {
+      "type": "association",
+      "name": "R1",
+      "class": [
+        {
+          "class_id": "101",
+          "class_name": "Employee",
+          "class_multiplicity": "1..1"
+        },
+        {
+          "class_id": "103",
+          "class_name": "Attendance",
+          "class_multiplicity": "0..*"
+        }
+      ]
+    },
+    {
+      "type": "association",
+      "name": "R2",
+      "class": [
+        {
+          "class_id": "102",
+          "class_name": "Schedule",
+          "class_multiplicity": "1..1"
+        },
+        {
+          "class_id": "103",
+          "class_name": "Attendance",
+          "class_multiplicity": "0..*"
+        }
+      ]
+    },
+    {
+      "type": "class",
+      "class_id": "998",
+      "class_name": "EventInstance",
+      "KL": "EVT",
+      "attributes": [
+        { "attribute_name": "EventId", "data_type": "string" },
+        { "attribute_name": "Label", "data_type": "string" },
+        { "attribute_name": "Target", "data_type": "object" },
+        { "attribute_name": "Data", "data_type": "object" }
+      ]
+    },
+    {
+      "type": "class",
+      "class_id": "999",
+      "class_name": "TimerService",
+      "KL": "TMR",
+      "attributes": [
+        { "attribute_name": "TimerId", "data_type": "unique_id" },
+        { "attribute_name": "ExpirationTime", "data_type": "integer" }
+      ]
+    },
+    {
+      "type": "external_entity",
+      "ee_id": "201",
+      "ee_name": "Notification",
+      "KL": "NOTIF",
+      "description": "Sistem pengiriman email"
+    },
+    {
+      "type": "external_entity",
+      "ee_id": "202",
+      "ee_name": "TimeBridge",
+      "KL": "TIM",
+      "description": "Utility waktu"
+    }
+  ]
+}

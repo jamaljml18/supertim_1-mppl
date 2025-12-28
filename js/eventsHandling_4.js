@@ -1,89 +1,58 @@
 const EventCompiler = {
   compileAction: function (oalCode) {
-    if (!oalCode) return "// [Info] No action code defined.";
-
+    if (!oalCode) return "// No action code";
     let code = oalCode;
 
-    // =====================================================================
-    // 1. EXPLICIT EVENT HANDLING (NEW REQUEST)
-    // =====================================================================
+    const formatParams = (p) => (p ? p.replace(/:/g, " = ") : "");
 
-    // A. CREATE EVENT INSTANCE (Eksplisit)
-    // OAL: create event instance evt_email of Email to Notification;
-    // C# : var evt_email = new Events.Email(); evt_email.Target = Notification;
+    // 1. Cancel Timer (OAL: cancel t_timeout from self)
     code = code.replace(
-      /create\s+event\s+instance\s+([A-Za-z0-9_]+)\s+of\s+([A-Za-z0-9_]+)\s+to\s+([A-Za-z0-9_.]+);/g,
-      "var $1 = new Events.$2(); $1.Target = $3;"
+      /cancel\s+(\w+)\s+from\s+(\w+);?/g,
+      "TimerService.Cancel($1)"
     );
 
-    // B. CREATE TIMER (Eksplisit)
-    // OAL: create timer t_timeout of (self.end_time + 30) generating evt_timeout;
-    // C# : var t_timeout = evt_timeout.Target.StartTimer(evt_timeout, (self.end_time + 30));
+    // 2. Bridge Call (OAL: TIM::getCurrentTime)
+    code = code.replace(/(\w+)::(\w+)/g, "$1.$2");
+
+    // 3. Create Event Instance
     code = code.replace(
-      /create\s+timer\s+([A-Za-z0-9_]+)\s+of\s+\((.*?)\)\s+generating\s+([A-Za-z0-9_]+);/g,
-      "var $1 = $3.Target.StartTimer($3, $2);"
+      /create\s+event\s+instance\s+(\w+)\s+of\s+(\w+)(?::'(.+?)')?\s*(\(.*?\))?\s*to\s+(\w+);/g,
+      (m, handle, eventId, meaning, params, target) => {
+        const p = formatParams(params);
+        return `var ${handle} = new EventInstance("${eventId}", "${
+          meaning || ""
+        }", ${target}, new { ${p.slice(1, -1)} })`;
+      }
     );
 
-    // C. GENERATE EVENT INSTANCE (Eksplisit - Kirim yang sudah dibuat)
-    // OAL: generate evt_email;
-    // C# : evt_email.Target.GenerateEvent(evt_email);
+    // 4. Generate Event (Langsung & Handle)
     code = code.replace(
-      /generate\s+([A-Za-z0-9_]+);/g,
-      "$1.Target.GenerateEvent($1);"
+      /generate\s+(\w+)(?::'(.+?)')?\s*(\(.*?\))?\s*to\s+(\w+);/g,
+      (m, eventId, meaning, params, target) => {
+        const p = formatParams(params);
+        return `${target}.ReceiveEvent("${eventId}", "${
+          meaning || ""
+        }", new { ${p.slice(1, -1)} })`;
+      }
+    );
+    code = code.replace(/generate\s+(\w+);/g, "$1.Send()");
+
+    // 5. Timer
+    code = code.replace(
+      /create\s+timer\s+(\w+)\s+of\s+\((.*?)\)\s+generating\s+(\w+);/g,
+      "var $1 = TimerService.Create($2, $3)"
     );
 
-    // =====================================================================
-    // 2. STANDARD OAL COMMANDS
-    // =====================================================================
-
-    // D. INSTANCE CREATION (Object)
-    // OAL: create object instance a of Attendance;
+    // 6. Keywords & Control Flow
     code = code.replace(
-      /create\s+object\s+instance\s+([A-Za-z0-9_]+)\s+of\s+([A-Za-z0-9_]+);/g,
-      "var $1 = new $2();"
+      /create\s+object\s+instance\s+(\w+)\s+of\s+(\w+);/g,
+      "var $1 = new $2()"
     );
-
-    // E. ASSIGNMENT
     code = code.replace(/^\s*assign\s+/gm, "");
-
-    // F. RELATE
-    code = code.replace(
-      /relate\s+([A-Za-z0-9_.]+)\s+to\s+([A-Za-z0-9_]+)\s+across\s+([A-Za-z0-9_]+);/g,
-      '$1.RelateTo($2, "$3");'
-    );
-
-    // G. CANCEL TIMER
-    // OAL: cancel schedule_end_passed from self;
-    code = code.replace(
-      /cancel\s+([A-Za-z0-9_]+)\s+from\s+([A-Za-z0-9_.]+);/g,
-      "$2.CancelTimer(Events.$1);"
-    );
-
-    // =====================================================================
-    // 3. DATA ACCESS & LOGIC
-    // =====================================================================
-
-    // Access Event Data
-    code = code.replace(/\brcvd_evt\.([a-zA-Z0-9_]+)\b/g, "eventArgs.$1");
-
-    // Logical Operators
-    code = code.replace(/\s+and\s+/gi, " && ");
-    code = code.replace(/\s+or\s+/gi, " || ");
-    code = code.replace(/\s+not\s+/gi, " !");
-
-    // =====================================================================
-    // 4. CONTROL FLOW
-    // =====================================================================
-
-    // IF, ELSE IF, ELSE, END IF
-    const regexIf = /if\s*\((.*?)\)\s*(?:then)?/gi;
-    code = code.replace(regexIf, "if ($1) {");
-
-    const regexElif = /(?:elif|else\s+if)\s*\((.*?)\)\s*(?:then)?/gi;
-    code = code.replace(regexElif, "} else if ($1) {");
-
-    code = code.replace(/^\s*else\s*$/gm, "} else {");
-    code = code.replace(/end\s*if\s*;?/gi, "}");
+    code = code.replace(/if\s*\((.*?)\)\s*then/gi, "if ($1) {");
+    code = code.replace(/else\s+if\s*\((.*?)\)\s*then/gi, "} else if ($1) {");
+    code = code.replace(/else\s+/gi, "} else {");
+    code = code.replace(/end\s+if\s*;?/gi, "}");
 
     return code;
   },
